@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Portal dos Jogos</title>
+<style>
+body { font-family: Arial, sans-serif; padding: 20px; background:#f4f4f4; }
+h1 { text-align:center; }
+.produto { background: #fff; padding: 15px; margin: 10px 0; border-radius:5px; }
+button { margin: 5px; padding: 10px 15px; cursor:pointer; }
+#adminPanel { display:none; background:#fff; padding:15px; border-radius:5px; margin-top:20px; }
+#saldo { font-weight:bold; }
+.produto-bloqueado { opacity:0.5; pointer-events:none; }
+</style>
+<script src="https://sdk.mercadopago.com/js/v2"></script>
+</head>
+<body>
+
+<h1>Portal dos Jogos</h1>
+
+<div id="produtos"></div>
+
+<hr>
+<h2>Painel Administrativo</h2>
+<label>Senha:</label>
+<input type="password" id="senha">
+<button onclick="loginAdmin()">Entrar</button>
+
+<div id="adminPanel">
+<h3>Saldo acumulado: R$ <span id="saldo">0</span></h3>
+<button onclick="sacarSaldo()">Sacar</button>
+<h3>Lista de Produtos</h3>
+<div id="produtosAdmin"></div>
+</div>
+
+<script>
+/*************** CONFIGURAÇÃO INICIAL ****************/
+const PUBLIC_KEY_MP = "SUA_PUBLIC_KEY"; // substitua pela sua chave pública Mercado Pago
+let saldo = 0; // saldo simulado
+const produtos = [];
+const statusProdutos = {}; // controle de bloqueio: "disponivel", "reservado", "vendido"
+
+// Gerar 100 produtos com preços variados de 20 a 5000
+let preco = 20;
+for(let i=1;i<=100;i++){
+  produtos.push({
+    id: i,
+    nome: `Conta FF #${i}`,
+    valor: preco,
+    mpPreference: `ID_DO_ITEM_${i}` // substitua por IDs reais do Mercado Pago
+  });
+  statusProdutos[i] = "disponivel";
+  preco += 20;
+  if(preco > 5000) preco = 20;
+}
+
+/*************** FUNÇÃO PARA EXIBIR PRODUTOS ****************/
+const produtosDiv = document.getElementById("produtos");
+function renderProdutos(){
+  produtosDiv.innerHTML = "";
+  produtos.forEach((produto,index)=>{
+    const div = document.createElement("div");
+    div.classList.add("produto");
+    if(statusProdutos[produto.id]!=="disponivel") div.classList.add("produto-bloqueado");
+
+    let botaoPIX = statusProdutos[produto.id]==="disponivel"
+      ? `<button onclick="comprarPIX(${produto.id})">PIX</button>`
+      : `<button disabled>Indisponível</button>`;
+
+    div.innerHTML = `
+      <h3>${produto.nome} - R$ ${produto.valor}</h3>
+      ${botaoPIX}
+      <div class="cho-container-${index}"></div>
+    `;
+    produtosDiv.appendChild(div);
+
+    // Botão Cartão Mercado Pago apenas se disponível
+    if(statusProdutos[produto.id]==="disponivel"){
+      const mp = new MercadoPago(PUBLIC_KEY_MP, { locale: 'pt-BR' });
+      mp.checkout({
+        preference: { id: produto.mpPreference },
+        render: { container: `.cho-container-${index}`, label: 'Pagar com Cartão' }
+      });
+    }
+  });
+}
+renderProdutos();
+
+/*************** FUNÇÃO DE COMPRA PIX ****************/
+function comprarPIX(id){
+  if(statusProdutos[id]!=="disponivel") return alert("Produto indisponível");
+  statusProdutos[id] = "vendido";
+  saldo += produtos.find(p=>p.id===id).valor;
+  alert("Compra via PIX registrada! Produto vendido.");
+  renderProdutos();
+  atualizarAdmin();
+}
+
+/*************** PAINEL ADMINISTRATIVO ****************/
+function loginAdmin(){
+  const senha = document.getElementById("senha").value;
+  if(senha === "SENHA_ADMIN"){ // altere para sua senha
+    document.getElementById("adminPanel").style.display = "block";
+    atualizarAdmin();
+  }else{
+    alert("Senha incorreta!");
+  }
+}
+
+function atualizarAdmin(){
+  document.getElementById("saldo").innerText = saldo;
+  const divAdmin = document.getElementById("produtosAdmin");
+  divAdmin.innerHTML = "";
+  produtos.forEach(prod=>{
+    const p = document.createElement("p");
+    let status = statusProdutos[prod.id];
+    p.innerText = `${prod.nome} - R$ ${prod.valor} - Status: ${status}`;
+    divAdmin.appendChild(p);
+  });
+}
+
+function sacarSaldo(){
+  alert(`Você pode sacar R$ ${saldo} usando o gateway de pagamentos.`);
+}
+</script>
+
+</body>
+</html>
